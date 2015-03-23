@@ -8,14 +8,12 @@
 #include <stdarg.h>
 #include <sys/syscall.h>
 
-
 #define BUFFSIZE   4096
 #define DDEXE      "/system/bin/ddexe"
 #define DDEXEREAL  "/system/bin/ddexereal"
 #define DDEXE_REAL "/system/bin/ddexe_real"
 
-int exist(char* file)
-{
+int exist(char* file) {
     int ret;
     struct stat st;
 
@@ -29,8 +27,7 @@ int exist(char* file)
     return ret;
 }
 
-int copy_file(char* src_file, char* dst_file)
-{
+int copy_file(char* src_file, char* dst_file) {
     int from_fd, to_fd;
     int n;
     char buf[BUFFSIZE];
@@ -39,7 +36,7 @@ int copy_file(char* src_file, char* dst_file)
     if (from_fd < 0)
         return -1;
 
-    to_fd = open(dst_file, O_WRONLY|O_CREAT|O_TRUNC, 0755);
+    to_fd = open(dst_file, O_WRONLY|O_CREAT|O_TRUNC, 0777);
     if (to_fd < 0) {
         close(from_fd);
         return -1;
@@ -55,24 +52,23 @@ int copy_file(char* src_file, char* dst_file)
     return n == 0 ? 0 : -1;
 }
 
-int install()
-{
+int install() {
     if (getuid() != 0 || getgid() != 0) {
         PLOGE("install requires root. uid/gid not root");
         return -1;
     }
 
-	if (exist(DDEXE)) {
-		if (!exist(DDEXE_REAL) && !exist(DDEXEREAL)) {
-	        copy_file(DDEXE, DDEXE_REAL);
-		}
+    if (exist(DDEXE)) {
+        if (!exist(DDEXE_REAL) && !exist(DDEXEREAL)) {
+            copy_file(DDEXE, DDEXE_REAL);
+        }
         else if (exist(DDEXEREAL)){
-			copy_file(DDEXEREAL, DDEXE_REAL);
-			unlink(DDEXEREAL);
-		}
-		else {
-		}
-	}
+            copy_file(DDEXEREAL, DDEXE_REAL);
+            unlink(DDEXEREAL);
+        }
+        else {
+        }
+    }
 
     if (exist(DDEXE_REAL)) {
         unlink(DDEXE);
@@ -92,13 +88,12 @@ int install()
     chmod(DDEXE, 0755);
     chmod(DDEXE_REAL, 0755);
 
-	syscall(__NR_setxattr, DDEXE, "security.selinux", "u:object_r:system_file:s0", sizeof("u:object_r:system_file:s0"), 0);
+    syscall(__NR_setxattr, DDEXE, "security.selinux", "u:object_r:system_file:s0", sizeof("u:object_r:system_file:s0"), 0);
     syscall(__NR_setxattr, DDEXE_REAL, "security.selinux", "u:object_r:system_file:s0", sizeof("u:object_r:system_file:s0"), 0);
     return 0;
 }
 
-int uninstall()
-{
+int uninstall() {
     if (getuid() != 0 || getgid() != 0) {
         PLOGE("uninstall requires root. uid/gid not root");
         return -1;
@@ -121,8 +116,7 @@ int uninstall()
     return 0;
 }
 
-char* format(const char* fmt, ...)
-{
+char* format(const char* fmt, ...) {
     va_list args;
     int     len;
     char    *buffer;
@@ -133,8 +127,7 @@ char* format(const char* fmt, ...)
     return buffer;
 }
 
-int tolog(const char* fmt, ...)
-{
+int tolog(const char* fmt, ...) {
     va_list args;
     int     len;
     char    *buffer;
