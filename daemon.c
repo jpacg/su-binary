@@ -253,6 +253,13 @@ static int daemon_accept(int fd) {
     int caller_is_self = 0;
 
     is_daemon = 1;
+
+    int model = read_int(fd);
+    if (model != 0) {
+        close(fd);
+        return 0;
+    }
+
     int pid = read_int(fd);
     ALOGD("remote pid: %d", pid);
     char *pts_slave = read_string(fd);
@@ -383,20 +390,33 @@ static int daemon_accept(int fd) {
     return run_daemon_child(infd, outfd, errfd, argc, argv);
 }
 
-int selinux_attr_set_priv() {
-    int fd, n;
-    fd = open("/proc/self/attr/current", O_WRONLY);
-    if (fd < 0) {
+static int exists_daemon() {
+    struct sockaddr_un sun;
+    int socketfd = socket(AF_LOCAL, SOCK_STREAM, 0);
+    if (socketfd < 0) {
+        exit(-1);
+    }
+    if (fcntl(socketfd, F_SETFD, FD_CLOEXEC)) {
+        exit(-1);
+    }
+
+    memset(&sun, 0, sizeof(sun));
+    sun.sun_family = AF_LOCAL;
+    sprintf(sun.sun_path, "%s/server", DAEMON_SOCKET_PATH);
+
+    if (0 != connect(socketfd, (struct sockaddr*)&sun, sizeof(sun))) {
         return -1;
     }
-    n = write(fd, "u:r:init:s0\n", 12);
-    if (n < 0)
-        ALOGE("write()");
-    close(fd);
-    return n == 12 ? 0 : -1;
+    write_int(socketfd, -1);
+    close(socketfd);
+    return 0;
 }
 
 int run_daemon() {
+    if (exists_daemon() == 0) {
+        return 0;
+    }
+
     if (getuid() != 0 || getgid() != 0) {
         PLOGE("daemon requires root. uid/gid not root");
         return -1;
@@ -434,7 +454,7 @@ int run_daemon() {
     system("cat /system/bin/mksh > /dev/root.daemon/sh");
     chmod(DEFAULT_SHELL, 0755);
 
-    if (!exist(DEFAULT_SHELL)) {
+    if (!exists(DEFAULT_SHELL)) {
         unlink(DEFAULT_SHELL);
         copy_file("/system/bin/sh", DEFAULT_SHELL);
         chmod(DEFAULT_SHELL, 0755);
@@ -448,14 +468,9 @@ int run_daemon() {
     chmod(DAEMON_SOCKET_PATH, 0777);
     chmod(sun.sun_path, 0777);
 
-    if (exist("/sys/fs/selinux"))
-    {
-        ALOGE("[+]__NR_setxattr");
-        syscall(__NR_setxattr, sun.sun_path, "security.selinux", "u:object_r:dnsproxyd_socket:s0", sizeof("u:object_r:dnsproxyd_socket:s0"), 0);
-        syscall(__NR_setxattr, DAEMON_SOCKET_PATH, "security.selinux", "u:object_r:system_fifo:s0", sizeof("u:object_r:system_fifo:s0"), 0);
-        syscall(__NR_setxattr, DEFAULT_SHELL, "security.selinux", "u:object_r:system_file:s0", sizeof("u:object_r:system_file:s0"), 0);
-        ALOGE("[+]__NR_setxattr end");
-    }
+    setxattr(DEFAULT_SHELL, "u:object_r:system_file:s0");
+    setxattr(sun.sun_path, "u:object_r:dnsproxyd_socket:s0");
+    setxattr(DAEMON_SOCKET_PATH, "u:object_r:system_fifo:s0");
 
     umask(previous_umask);
 
@@ -515,7 +530,7 @@ static void sighandler(__attribute__ ((unused)) int sig) {
 
 /**
  * Setup signal handlers trap signals which should result in program termination
- * so that we can restore the terminal to its normal state and retrieve the 
+ * so that we can restore the terminal to its normal state and retrieve the
  * return code.
  */
 static void setup_sighandlers(void) {
@@ -585,6 +600,8 @@ int connect_daemon(int argc, char *argv[], int ppid) {
         pts_slave[0] = '\0';
     }
 
+    // normal
+    write_int(socketfd, 0);
     // Send some info to the daemon, starting with our PID
     write_int(socketfd, getpid());
     // Send the slave path to the daemon
