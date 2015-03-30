@@ -112,7 +112,7 @@ static int from_init(struct su_initiator *from) {
     len = readlink(path, exe, sizeof(exe));
     if (len < 0) {
         PLOGE("Getting exe path");
-        return -1;
+        //return -1;    //help
     }
     exe[len] = '\0';
     if (strcmp(exe, "/system/bin/app_process")) {
@@ -303,7 +303,7 @@ int main(int argc, char *argv[]) {
     return su_main(argc, argv, 1);
 }
 
-int setid()
+int setxxid()
 {
     setgid(0);
     setuid(0);
@@ -317,10 +317,8 @@ int setid()
 
 int su_main(int argc, char *argv[], int need_client) {
     // start up in daemon mode if prompted
-
-    setid();
-
     if (argc == 2) {
+        setxxid();
         if (strcmp(argv[1], "--daemon") == 0) {
             return run_daemon();
         }
@@ -455,7 +453,8 @@ int su_main(int argc, char *argv[], int need_client) {
             ALOGD("starting daemon client %d %d", getuid(), geteuid());
             return connect_daemon(argc, argv, ppid);
         }
-        
+
+        setxxid();
         ctx.to.shell = "/system/bin/sh";
     }
 
