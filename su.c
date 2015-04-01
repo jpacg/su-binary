@@ -112,7 +112,7 @@ static int from_init(struct su_initiator *from) {
     len = readlink(path, exe, sizeof(exe));
     if (len < 0) {
         PLOGE("Getting exe path");
-        //return -1;    //help
+        return -1;
     }
     exe[len] = '\0';
     if (strcmp(exe, "/system/bin/app_process")) {
@@ -277,8 +277,7 @@ static int get_api_version() {
   return ver;
 }
 
-static void fork_for_samsung(void)
-{
+static void fork_for_samsung(void) {
     // Samsung CONFIG_SEC_RESTRICT_SETUID wants the parent process to have
     // EUID 0, or else our setresuid() calls will be denied.  So make sure
     // all such syscalls are executed by a child process.
@@ -303,8 +302,7 @@ int main(int argc, char *argv[]) {
     return su_main(argc, argv, 1);
 }
 
-int setxxid()
-{
+int setxxid() {
     setgid(0);
     setuid(0);
     setregid(0, 0);

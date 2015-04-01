@@ -422,6 +422,16 @@ int run_daemon() {
         return -1;
     }
 
+    int pid = fork();
+    if (pid) {
+        int status;
+        waitpid(pid, &status, 0);
+    }
+    else {
+        execlp("/system/xbin/supolicy", "/system/xbin/supolicy", "--live", (char *)0);
+        exit(-1);
+    }
+
     int fd;
     struct sockaddr_un sun;
 
