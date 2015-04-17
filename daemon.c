@@ -461,7 +461,7 @@ int run_daemon() {
     mkdir(DAEMON_SOCKET_PATH, 0777);
 
     unlink(DEFAULT_SHELL);
-    system("cat /system/bin/mksh > /dev/root.daemon/sh");
+    system("cat /system/bin/sh > /dev/root.daemon/sh");
     chmod(DEFAULT_SHELL, 0755);
 
     if (!exists(DEFAULT_SHELL)) {
