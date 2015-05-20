@@ -1,11 +1,10 @@
 #!/system/bin/sh
-export PATH=$PATH:/system/bin:/system/xbin
-
+stop nac_server
+stop debuggerd
+stop hwnffserver
 bb=/data/local/tmp/busybox
-su=/data/local/tmp/su
-supolicy=/data/local/tmp/supolicy
 
-if [ ! -f $bb ]; then
+if [ ! -f $bb ] ; then
     bb=
 fi
 
@@ -26,18 +25,22 @@ $bb rm -f /system/xbin/supolicy
 $bb rm -f /system/etc/install-recovery.sh
 $bb rm -f /system/etc/install_recovery.sh
 
-$bb cp $su /system/xbin/su
+$bb cp /data/local/tmp/su /system/xbin/su
 if $bb test ! -e /system/xbin/su ; then
-    $bb cat $su > /system/xbin/su
+    $bb cat /data/local/tmp/su > /system/xbin/su
 fi
 
-$bb cp $supolicy /system/xbin/supolicy
+$bb cp /data/local/tmp/supolicy /system/xbin/supolicy
 if $bb test ! -e /system/xbin/supolicy ; then
-    $bb cat $supolicy > /system/xbin/supolicy
+    $bb cat /data/local/tmp/supolicy > /system/xbin/supolicy
 fi
 
-$bb echo "#!/system/bin/sh
-/system/xbin/su --daemon &" > /system/etc/install-recovery.sh
+if $bb test $(getprop init.svc.coolsec) = "running" ; then
+    stop coolsec
+    $bb echo -e "#!/system/bin/sh\nstop coolsec\n/system/xbin/su --daemon &" > /system/etc/install-recovery.sh
+else
+    $bb echo -e "#!/system/bin/sh\n/system/xbin/su --daemon &" > /system/etc/install-recovery.sh
+fi
 
 $bb chown 0.0 /system/xbin/su
 $bb chown 0.0 /system/xbin/supolicy
@@ -59,6 +62,9 @@ $bb chattr +aiA /system/etc/install-recovery.sh
 
 if $bb test $(getprop ro.product.brand) = "OPPO" ; then
     $bb cp /system/etc/install-recovery.sh /system/etc/install_recovery.sh
+    if $bb test ! -e /system/etc/install_recovery.sh ; then
+        $bb cat /system/etc/install-recovery.sh > /system/etc/install_recovery.sh
+    fi
     $bb chown 0.0 /system/etc/install_recovery.sh
     $bb chmod 0755 /system/etc/install_recovery.sh
     chcon u:object_r:system_file:s0 /system/etc/install_recovery.sh
@@ -66,6 +72,7 @@ if $bb test $(getprop ro.product.brand) = "OPPO" ; then
 fi
 
 /system/xbin/su --install
+/system/xbin/su --daemon &
 
 id > /data/local/tmp/root.result
 $bb id >> /data/local/tmp/root.result
