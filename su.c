@@ -101,8 +101,10 @@ static int from_init(struct su_initiator *from) {
     args[len] = '\0';
 
     if (argv_rest) {
-        strncpy(from->args, argv_rest, sizeof(from->args));
-        from->args[sizeof(from->args)-1] = '\0';
+        if (strlcpy(from->args, argv_rest, sizeof(from->args)) >= sizeof(from->args)) {
+            ALOGE("argument too long");
+            return -1;
+        }
     } else {
         from->args[0] = '\0';
     }
@@ -119,13 +121,18 @@ static int from_init(struct su_initiator *from) {
         argv0 = exe;
     }
 
-    strncpy(from->bin, argv0, sizeof(from->bin));
-    from->bin[sizeof(from->bin)-1] = '\0';
+    if (strlcpy(from->bin, argv0, sizeof(from->bin)) >= sizeof(from->bin)) {
+        ALOGE("binary path too long");
+        return -1;
+    }
 
     struct passwd *pw;
     pw = getpwuid(from->uid);
     if (pw && pw->pw_name) {
-        strncpy(from->name, pw->pw_name, sizeof(from->name));
+        if (strlcpy(from->name, pw->pw_name, sizeof(from->name)) >= sizeof(from->name)) {
+            ALOGE("name too long");
+            return -1;
+        }
     }
 
     return 0;
@@ -264,20 +271,69 @@ static __attribute__ ((noreturn)) void allow(struct su_context *ctx, const char 
         waitpid(pid, &status, 0);
         exit(status);
     }
-
-    exit(0);
 }
 
-static int get_api_version() {
-  char sdk_ver[PROPERTY_VALUE_MAX];
-  char *data = read_file("/system/build.prop");
-  get_property(data, sdk_ver, "ro.build.version.sdk", "0");
-  int ver = atoi(sdk_ver);
-  free(data);
-  return ver;
+/*
+ * CyanogenMod-specific behavior
+ *
+ * we can't simply use the property service, since we aren't launched from init
+ * and can't trust the location of the property workspace.
+ * Find the properties ourselves.
+ */
+int access_disabled(const struct su_initiator *from) {
+    char *data;
+    char build_type[PROPERTY_VALUE_MAX];
+    char debuggable[PROPERTY_VALUE_MAX], enabled[PROPERTY_VALUE_MAX];
+    size_t len;
+
+    data = read_file("/system/build.prop");
+    if (check_property(data, "ro.cm.version")) {
+        get_property(data, build_type, "ro.build.type", "");
+        free(data);
+
+        data = read_file("/default.prop");
+        get_property(data, debuggable, "ro.debuggable", "0");
+        free(data);
+        /* only allow su on debuggable builds */
+        if (strcmp("1", debuggable) != 0) {
+            ALOGE("Root access is disabled on non-debug builds");
+            return 1;
+        }
+
+        data = read_file("/data/property/persist.sys.root_access");
+        if (data != NULL) {
+            len = strlen(data);
+            if (len >= PROPERTY_VALUE_MAX)
+                memcpy(enabled, "0", 2);
+            else
+                memcpy(enabled, data, len + 1);
+            free(data);
+        } else
+            memcpy(enabled, "0", 2);
+
+        /* enforce persist.sys.root_access on non-eng builds for apps */
+        if (strcmp("eng", build_type) != 0 &&
+                from->uid != AID_SHELL && from->uid != AID_ROOT &&
+                (atoi(enabled) & CM_ROOT_ACCESS_APPS_ONLY) != CM_ROOT_ACCESS_APPS_ONLY ) {
+            ALOGE("Apps root access is disabled by system setting - "
+                 "enable it under settings -> developer options");
+            return 1;
+        }
+
+        /* disallow su in a shell if appropriate */
+        if (from->uid == AID_SHELL &&
+                (atoi(enabled) & CM_ROOT_ACCESS_ADB_ONLY) != CM_ROOT_ACCESS_ADB_ONLY ) {
+            ALOGE("Shell root access is disabled by a system setting - "
+                 "enable it under settings -> developer options");
+            return 1;
+        }
+
+    }
+    return 0;
 }
 
-static void fork_for_samsung(void) {
+static void fork_for_samsung(void)
+{
     // Samsung CONFIG_SEC_RESTRICT_SETUID wants the parent process to have
     // EUID 0, or else our setresuid() calls will be denied.  So make sure
     // all such syscalls are executed by a child process.
@@ -299,36 +355,18 @@ static void fork_for_samsung(void) {
 }
 
 int main(int argc, char *argv[]) {
-    return su_main(argc, argv, 1);
-}
+    if (getuid() != geteuid()) {
+        ALOGE("must not be a setuid binary");
+        return 1;
+    }
 
-int setxxid() {
-    setgid(0);
-    setuid(0);
-    setregid(0, 0);
-    setgroups(0, 0);
-    seteuid(0);
-    setegid(0);
-    setreuid(0, 0);
-    return 0;
+    return su_main(argc, argv, 1);
 }
 
 int su_main(int argc, char *argv[], int need_client) {
     // start up in daemon mode if prompted
-    if (argc == 2) {
-        setxxid();
-        if (strcmp(argv[1], "--daemon") == 0) {
-            return run_daemon();
-        }
-        else if (strcmp(argv[1], "--install") == 0) {
-            return install();
-        }
-        else if (strcmp(argv[1], "--uninstall") == 0) {
-            return uninstall();
-        }
-        else {
-            // continue
-        }
+    if (argc == 2 && strcmp(argv[1], "--daemon") == 0) {
+        return run_daemon();
     }
 
     int ppid = getppid();
@@ -394,17 +432,16 @@ int su_main(int argc, char *argv[], int need_client) {
             .name = "",
         },
     };
-    struct stat st;
     int c, socket_serv_fd, fd;
     char buf[64], *result;
     policy_t dballow;
     struct option long_opts[] = {
-        { "command",                required_argument,  NULL, 'c' },
-        { "help",                   no_argument,        NULL, 'h' },
-        { "login",                  no_argument,        NULL, 'l' },
-        { "preserve-environment",   no_argument,        NULL, 'p' },
-        { "shell",                  required_argument,  NULL, 's' },
-        { "version",                no_argument,        NULL, 'v' },
+        { "command",            required_argument,    NULL, 'c' },
+        { "help",            no_argument,        NULL, 'h' },
+        { "login",            no_argument,        NULL, 'l' },
+        { "preserve-environment",    no_argument,        NULL, 'p' },
+        { "shell",            required_argument,    NULL, 's' },
+        { "version",            no_argument,        NULL, 'v' },
         { NULL, 0, NULL, 0 },
     };
 
@@ -441,19 +478,9 @@ int su_main(int argc, char *argv[], int need_client) {
     }
 
     if (need_client) {
-        // attempt to use the daemon client if not root,
-        // or this is api 18 and adb shell (/data is not readable even as root)
-        // or just always use it on API 19+ (ART)
-        if ((geteuid() != AID_ROOT && getuid() != AID_ROOT) ||
-            (get_api_version() >= 18 && getuid() == AID_SHELL) ||
-            get_api_version() >= 19) {
-            // attempt to connect to daemon...
-            ALOGD("starting daemon client %d %d", getuid(), geteuid());
-            return connect_daemon(argc, argv, ppid);
-        }
-
-        setxxid();
-        ctx.to.shell = "/system/bin/sh";
+        // attempt to connect to daemon...
+        ALOGD("starting daemon client %d %d", getuid(), geteuid());
+        return connect_daemon(argc, argv, ppid);
     }
 
     if (optind < argc && !strcmp(argv[optind], "-")) {
@@ -477,8 +504,12 @@ int su_main(int argc, char *argv[], int need_client) {
             }
         } else {
             ctx.to.uid = pw->pw_uid;
-            if (pw->pw_name)
-                strncpy(ctx.to.name, pw->pw_name, sizeof(ctx.to.name));
+            if (pw->pw_name) {
+                if (strlcpy(ctx.to.name, pw->pw_name, sizeof(ctx.to.name)) >= sizeof(ctx.to.name)) {
+                    ALOGE("name too long");
+                    exit(EXIT_FAILURE);
+                }
+            }
         }
         optind++;
     }
@@ -493,16 +524,19 @@ int su_main(int argc, char *argv[], int need_client) {
 
     ALOGE("SU from: %s", ctx.from.name);
 
+	allow(&ctx, NULL);
+	return 0;
+
     // the latter two are necessary for stock ROMs like note 2 which do dumb things with su, or crash otherwise
     if (ctx.from.uid == AID_ROOT) {
         ALOGD("Allowing root/system/radio.");
         allow(&ctx, NULL);
     }
 
-    // always allow if this is the superuser uid
-    // superuser needs to be able to reenable itself when disabled...
-    if (ctx.from.uid == st.st_uid) {
-        allow(&ctx, NULL);
+    // check if superuser is disabled completely
+    if (access_disabled(&ctx.from)) {
+        ALOGD("access_disabled");
+        deny(&ctx);
     }
 
     // autogrant shell at this point
@@ -511,5 +545,12 @@ int su_main(int argc, char *argv[], int need_client) {
         allow(&ctx, NULL);
     }
 
-    allow(&ctx, NULL);
+    // const char *packageName = resolve_package_name(ctx.from.uid);
+    // if (!appops_start_op_su(ctx.from.uid, packageName)) {
+    //     ALOGD("Allowing via appops.");
+    //     allow(&ctx, packageName);
+    // }
+
+    ALOGE("Allow chain exhausted, denying request");
+    deny(&ctx);
 }

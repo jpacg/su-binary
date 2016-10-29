@@ -58,7 +58,9 @@ int get_property(const char *data, char *found, const char *searchkey, const cha
     char *key, *value, *eol, *sol, *tmp;
     if (data == NULL) goto defval;
     int matched = 0;
-    sol = strdup(data);
+    char *dup = strdup(data);
+
+    sol = dup;
     while((eol = strchr(sol, '\n'))) {
         key = sol;
         *eol++ = 0;
@@ -82,6 +84,7 @@ int get_property(const char *data, char *found, const char *searchkey, const cha
             break;
         }
     }
+    free(dup);
     int len;
     if (matched) {
         len = strlen(value);

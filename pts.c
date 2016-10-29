@@ -22,6 +22,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -118,8 +119,9 @@ int pts_open(char *slave_name, size_t slave_name_size) {
         return -2;
     }
 
-    strncpy(slave_name, sn_tmp, slave_name_size);
-    slave_name[slave_name_size - 1] = '\0';
+    if (strlcpy(slave_name, sn_tmp, slave_name_size) >= slave_name_size) {
+        return -1;
+    }
 
     // Grant, then unlock
     if (grantpt(fdm) == -1) {

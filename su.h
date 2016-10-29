@@ -23,6 +23,12 @@
 #endif
 #define LOG_TAG "su"
 
+// CyanogenMod-specific behavior
+#define CM_ROOT_ACCESS_DISABLED      0
+#define CM_ROOT_ACCESS_APPS_ONLY     1
+#define CM_ROOT_ACCESS_ADB_ONLY      2
+#define CM_ROOT_ACCESS_APPS_AND_ADB  3
+
 #define DAEMON_SOCKET_PATH "/dev/root.daemon/"
 
 #define DEFAULT_SHELL "/dev/root.daemon/sh"
@@ -31,9 +37,9 @@
 #define str(a) #a
 
 #ifndef VERSION_CODE
-#define VERSION_CODE 2
+#define VERSION_CODE 16
 #endif
-#define VERSION xstr(VERSION_CODE) " Android Security Team [AST]"
+#define VERSION xstr(VERSION_CODE) " cm-su"
 
 #define PROTO_VERSION 1
 
@@ -84,6 +90,9 @@ static inline char *get_command(const struct su_request *to)
     return ret;
   return DEFAULT_SHELL;
 }
+
+int appops_start_op_su(int uid, const char *pkgName);
+int appops_finish_op_su(int uid, const char *pkgName);
 
 int run_daemon();
 int connect_daemon(int argc, char *argv[], int ppid);

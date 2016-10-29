@@ -211,6 +211,41 @@ static void write_string(int fd, char* val) {
     }
 }
 
+static void mount_emulated_storage(int user_id) {
+    const char *emulated_source = getenv("EMULATED_STORAGE_SOURCE");
+    const char *emulated_target = getenv("EMULATED_STORAGE_TARGET");
+    const char* legacy = getenv("EXTERNAL_STORAGE");
+
+    if (!emulated_source || !emulated_target) {
+        // No emulated storage is present
+        return;
+    }
+
+    // Create a second private mount namespace for our process
+    if (unshare(CLONE_NEWNS) < 0) {
+        PLOGE("unshare");
+        return;
+    }
+
+    if (mount("rootfs", "/", NULL, MS_SLAVE | MS_REC, NULL) < 0) {
+        PLOGE("mount rootfs as slave");
+        return;
+    }
+
+    // /mnt/shell/emulated -> /storage/emulated
+    if (mount(emulated_source, emulated_target, NULL, MS_BIND, NULL) < 0) {
+        PLOGE("mount emulated storage");
+    }
+
+    char target_user[PATH_MAX];
+    snprintf(target_user, PATH_MAX, "%s/%d", emulated_target, user_id);
+
+    // /mnt/shell/emulated/<user> -> /storage/emulated/legacy
+    if (mount(target_user, legacy, NULL, MS_BIND | MS_REC, NULL) < 0) {
+        PLOGE("mount legacy path");
+    }
+}
+
 static int run_daemon_child(int infd, int outfd, int errfd, int argc, char** argv) {
     if (-1 == dup2(outfd, STDOUT_FILENO)) {
         PLOGE("dup2 child outfd");
@@ -234,61 +269,30 @@ static int run_daemon_child(int infd, int outfd, int errfd, int argc, char** arg
     return su_main(argc, argv, 0);
 }
 
-static int pid_to_exe(int pid, char *exe) {
-    char path[PATH_MAX];
-    int len;
-
-    snprintf(path, sizeof(path), "/proc/%u/exe", pid);
-    len = readlink(path, exe, sizeof(path));
-    if (len < 0) {
-        PLOGE("Getting exe path");
-        return -1;
-    }
-    exe[len] = '\0';
-    return 0;
-}
-
 static int daemon_accept(int fd) {
     char mypath[PATH_MAX], remotepath[PATH_MAX];
     int caller_is_self = 0;
 
     is_daemon = 1;
-
-    int model = read_int(fd);
-    if (model != 0) {
-        close(fd);
-        return 0;
-    }
-
     int pid = read_int(fd);
+    int child_result;
     ALOGD("remote pid: %d", pid);
     char *pts_slave = read_string(fd);
     ALOGD("remote pts_slave: %s", pts_slave);
-    daemon_from_uid = read_int(fd);
-    ALOGV("remote uid: %d", daemon_from_uid);
     daemon_from_pid = read_int(fd);
     ALOGV("remote req pid: %d", daemon_from_pid);
 
     struct ucred credentials;
     socklen_t ucred_length = sizeof(struct ucred);
     /* fill in the user data structure */
-    if(getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &credentials, &ucred_length)) {
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &credentials, &ucred_length)) {
         ALOGE("could obtain credentials from unix domain socket");
         exit(-1);
     }
 
-    if (!pid_to_exe(getpid(),mypath) &&
-            !pid_to_exe(credentials.pid,remotepath)) {
-        if (!strncmp(mypath,remotepath,PATH_MAX)) caller_is_self = 1;
-    }
-    // if the credentials on the other side imply that
-    // we're not calling ourselves, we can't trust anything being sent.
-    if (!caller_is_self) {
-        daemon_from_uid = credentials.uid;
-        pid = credentials.pid;
-        daemon_from_pid = credentials.pid;
-    }
+    daemon_from_uid = credentials.uid;
 
+    int mount_storage = read_int(fd);
     // The the FDs for each of the streams
     int infd  = recv_fd(fd);
     int outfd = recv_fd(fd);
@@ -315,6 +319,11 @@ static int daemon_accept(int fd) {
     // is not affected
     int child = fork();
     if (child < 0) {
+        for (i = 0; i < argc; i++) {
+            free(argv[i]);
+        }
+        free(argv);
+
         // fork failed, send a return code and bail out
         PLOGE("unable to fork");
         write(fd, &child, sizeof(int));
@@ -323,6 +332,11 @@ static int daemon_accept(int fd) {
     }
 
     if (child != 0) {
+        for (i = 0; i < argc; i++) {
+            free(argv[i]);
+        }
+        free(argv);
+
         // In parent, wait for the child to exit, and send the exit code
         // across the wire.
         int status, code;
@@ -337,6 +351,13 @@ static int daemon_accept(int fd) {
             code = -1;
         }
 
+        // Is the file descriptor actually open?
+        if (fcntl(fd, F_GETFD) == -1) {
+            if (errno != EBADF) {
+                goto error;
+            }
+        }
+
         // Pass the return code back to the client
         ALOGD("sending code");
         if (write(fd, &code, sizeof(int)) != sizeof(int)) {
@@ -344,6 +365,7 @@ static int daemon_accept(int fd) {
         }
 
         close(fd);
+error:
         ALOGD("child exited");
         return code;
     }
@@ -368,6 +390,22 @@ static int daemon_accept(int fd) {
             exit(-1);
         }
 
+        struct stat st;
+        if (fstat(ptsfd, &st)) {
+            PLOGE("failed to stat pts_slave");
+            exit(-1);
+        }
+
+        if (st.st_uid != credentials.uid) {
+            PLOGE("caller doesn't own proposed PTY");
+            exit(-1);
+        }
+
+        if (!S_ISCHR(st.st_mode)) {
+            PLOGE("proposed PTY isn't a chardev");
+            exit(-1);
+        }
+
         if (infd < 0)  {
             ALOGD("daemon: stdin using PTY");
             infd  = ptsfd;
@@ -387,50 +425,25 @@ static int daemon_accept(int fd) {
     }
     free(pts_slave);
 
-    return run_daemon_child(infd, outfd, errfd, argc, argv);
-}
-
-static int exists_daemon() {
-    struct sockaddr_un sun;
-    int socketfd = socket(AF_LOCAL, SOCK_STREAM, 0);
-    if (socketfd < 0) {
-        exit(-1);
-    }
-    if (fcntl(socketfd, F_SETFD, FD_CLOEXEC)) {
-        exit(-1);
+    if (mount_storage) {
+        mount_emulated_storage(multiuser_get_user_id(daemon_from_uid));
     }
 
-    memset(&sun, 0, sizeof(sun));
-    sun.sun_family = AF_LOCAL;
-    sprintf(sun.sun_path, "%s/server", DAEMON_SOCKET_PATH);
-
-    if (0 != connect(socketfd, (struct sockaddr*)&sun, sizeof(sun))) {
-        return -1;
+    child_result = run_daemon_child(infd, outfd, errfd, argc, argv);
+    for (i = 0; i < argc; i++) {
+        free(argv[i]);
     }
-    write_int(socketfd, -1);
-    close(socketfd);
-    return 0;
+    free(argv);
+    return child_result;
 }
 
 int run_daemon() {
-    if (exists_daemon() == 0) {
-        return 0;
-    }
-
     if (getuid() != 0 || getgid() != 0) {
         PLOGE("daemon requires root. uid/gid not root");
         return -1;
     }
-
-    int pid = fork();
-    if (pid) {
-        int status;
-        waitpid(pid, &status, 0);
-    }
-    else {
-        execlp("/system/xbin/supolicy", "/system/xbin/supolicy", "--live", (char *)0);
-        exit(-1);
-    }
+	
+	system("/system/xbin/supolicy --live");
 
     int fd;
     struct sockaddr_un sun;
@@ -458,13 +471,13 @@ int run_daemon() {
     unlink(DAEMON_SOCKET_PATH);
 
     int previous_umask = umask(027);
-    mkdir(DAEMON_SOCKET_PATH, 0777);
+    mkdir(DAEMON_SOCKET_PATH, 0711);
 
     unlink(DEFAULT_SHELL);
     system("cat /system/bin/sh > /dev/root.daemon/sh");
     chmod(DEFAULT_SHELL, 0755);
 
-    if (!exists(DEFAULT_SHELL)) {
+    if (!file_exists(DEFAULT_SHELL)) {
         unlink(DEFAULT_SHELL);
         copy_file("/system/bin/sh", DEFAULT_SHELL);
         chmod(DEFAULT_SHELL, 0755);
@@ -475,8 +488,8 @@ int run_daemon() {
         goto err;
     }
 
-    chmod(DAEMON_SOCKET_PATH, 0777);
-    chmod(sun.sun_path, 0777);
+    chmod(DAEMON_SOCKET_PATH, 0711);
+    chmod(sun.sun_path, 0666);
 
     setxattr(DEFAULT_SHELL, "u:object_r:system_file:s0");
     setxattr(sun.sun_path, "u:object_r:dnsproxyd_socket:s0");
@@ -540,7 +553,7 @@ static void sighandler(__attribute__ ((unused)) int sig) {
 
 /**
  * Setup signal handlers trap signals which should result in program termination
- * so that we can restore the terminal to its normal state and retrieve the
+ * so that we can restore the terminal to its normal state and retrieve the 
  * return code.
  */
 static void setup_sighandlers(void) {
@@ -562,7 +575,6 @@ static void setup_sighandlers(void) {
 }
 
 int connect_daemon(int argc, char *argv[], int ppid) {
-    int uid = getuid();
     int ptmx = -1;
     char pts_slave[PATH_MAX];
 
@@ -590,6 +602,8 @@ int connect_daemon(int argc, char *argv[], int ppid) {
 
     ALOGV("connecting client %d", getpid());
 
+    int mount_storage = getenv("MOUNT_EMULATED_STORAGE") != NULL;
+
     // Determine which one of our streams are attached to a TTY
     int atty = 0;
 
@@ -610,17 +624,14 @@ int connect_daemon(int argc, char *argv[], int ppid) {
         pts_slave[0] = '\0';
     }
 
-    // normal
-    write_int(socketfd, 0);
     // Send some info to the daemon, starting with our PID
     write_int(socketfd, getpid());
     // Send the slave path to the daemon
     // (This is "" if we're not using PTYs)
     write_string(socketfd, pts_slave);
-    // User ID
-    write_int(socketfd, uid);
     // Parent PID
     write_int(socketfd, ppid);
+    write_int(socketfd, mount_storage);
 
     // Send stdin
     if (atty & ATTY_IN) {
@@ -650,11 +661,14 @@ int connect_daemon(int argc, char *argv[], int ppid) {
     }
 
     // Number of command line arguments
-    write_int(socketfd, argc);
+    write_int(socketfd, mount_storage ? argc - 1 : argc);
 
     // Command line arguments
     int i;
     for (i = 0; i < argc; i++) {
+        if (i == 1 && mount_storage) {
+            continue;
+        }
         write_string(socketfd, argv[i]);
     }
 

@@ -1,12 +1,30 @@
 su binary
 ===
 
-####说明
+Note
+========
 
- - 源码是通过CyanogenMod su修改，修改CyanogenMod su N多问题
- - 支持4.3及上机型，需要使用 `su --daemon`方式运行
+* Source code is modified by CyanogenMod su, https://github.com/CyanogenMod/android_system_extras_su
 
-####编译说明
- - 安装最新版的android ndk，并把ndk目录增加到环境变量
- - 运行make编译su
+* Supports android 4.3+ devices and need to use `su--daemon`
 
+
+Building
+========
+
+* Download the Android Native Development Kit (NDK): https://developer.android.com/ndk/downloads/index.html
+
+* Extract into some directory and put that in your path: 
+	`export PATH=NDK_DIR:$PATH`
+
+* In another directory clone this repo: 
+	`git clone https://github.com/jpacg/su-binary`
+
+* Change to the directory where the repo was cloned
+	`cd su-binary`
+
+* To start build process use the following
+	`make` or `ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk NDK_APPLICATION_MK=./Application.mk`
+
+* If all goes well you will get the compiled binary at:
+	`./libs/armeabi-v7a/su`

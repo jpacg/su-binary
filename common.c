@@ -13,16 +13,19 @@
 #include "utils.h"
 
 #define BUFFSIZE   4096
-#define DDEXE      "/system/bin/ddexe"
-#define DDEXEREAL  "/system/bin/ddexereal"
-#define DDEXE_REAL "/system/bin/ddexe_real"
+#define MULTIUSER_APP_PER_USER_RANGE 100000
 
-int exists(const char *path) {
-    return !access(path, R_OK);
+typedef uid_t userid_t;
+userid_t multiuser_get_user_id(uid_t uid) {
+    return uid / MULTIUSER_APP_PER_USER_RANGE;
+}
+
+int file_exists(const char *path) {
+    return access(path, R_OK) == 0;
 }
 
 int setxattr(const char *path, const char *value) {
-    if (!exists("/sys/fs/selinux")) {
+    if (!file_exists("/sys/fs/selinux")) {
         return 0;
     }
     return syscall(__NR_setxattr, path, "security.selinux", value, strlen(value), 0);
@@ -114,11 +117,11 @@ int mount_system() {
 
     ret = get_mounts_dev_dir("/system", &dev, &dir);
     if (ret < 0) {
-        system("mount -o remount rw /system");
+        system("mount -o remount,rw /system");
         return mount("ro", "/system", NULL, 32800, NULL);
     }
 
-    system("mount -o remount rw /system");
+    system("mount -o remount,rw /system");
     ret = mount(dev, dir, "none", MS_REMOUNT, NULL);
     free(dev);
     free(dir);
@@ -139,91 +142,8 @@ static int write_file(const char *path, const char *data, uid_t owner, gid_t gro
     return n == len ? 0 : -1;;
 }
 
-int OPPO() {
-    char brand[PROPERTY_VALUE_MAX];
-    char *data = read_file("/system/build.prop");
-    get_property(data, brand, "ro.product.brand", "0");
-    free(data);
-
-    if (strstr(brand, "OPPO")) {
-        return write_file("/system/etc/install_recovery.sh", \
-            "#!/system/bin/sh\n/system/xbin/su --daemon &\n", \
-            0, 0, 0755);
-    }
-
-    return 0;
-}
-
-int install_recovery_sh() {
-    if (getuid() != 0 || getgid() != 0) {
-        PLOGE("install_recovery_sh requires root. uid/gid not root");
-        return -1;
-    }
-    mount_system();
-
-    write_file("/system/etc/install-recovery.sh", \
-        "#!/system/bin/sh\n/system/xbin/su --daemon &\n", \
-        0, 0, 0755);
-
-    return OPPO();
-}
-
-int install() {
-    if (getuid() != 0 || getgid() != 0) {
-        PLOGE("install requires root. uid/gid not root");
-        return -1;
-    }
-    mount_system();
-    install_recovery_sh();
-
-    if (exists(DDEXE)) {
-        if (!exists(DDEXE_REAL) && !exists(DDEXEREAL)) {
-            copy_file(DDEXE, DDEXE_REAL);
-        }
-        else if (exists(DDEXEREAL)){
-            copy_file(DDEXEREAL, DDEXE_REAL);
-            unlink(DDEXEREAL);
-        }
-        else {
-        }
-    }
-    chown(DDEXE_REAL, 0, 2000);
-    chmod(DDEXE_REAL, 0755);
-
-    if (exists(DDEXE_REAL)) {
-        unlink(DDEXE);
-        write_file(DDEXE, \
-            "#!/system/bin/sh\n/system/xbin/su --daemon &\n/system/bin/ddexe_real\n", \
-            0, 2000, 0755);
-    }
-
-    setxattr(DDEXE, "u:object_r:system_file:s0");
-    setxattr(DDEXE_REAL, "u:object_r:system_file:s0");
-    return 0;
-}
-
-int uninstall() {
-    if (getuid() != 0 || getgid() != 0) {
-        PLOGE("uninstall requires root. uid/gid not root");
-        return -1;
-    }
-    mount_system();
-
-    if (exists(DDEXEREAL)) {
-        copy_file(DDEXEREAL, DDEXE);
-        unlink(DDEXEREAL);
-    }
-    else if (exists(DDEXE_REAL)) {
-        copy_file(DDEXE_REAL, DDEXE);
-        unlink(DDEXE_REAL);
-    }
-    else {
-    }
-
-    chown(DDEXE, 0, 2000);
-    chmod(DDEXE, 0755);
-
-    setxattr(DDEXE, "u:object_r:system_file:s0");
+int fix_unused(const char* fmt, ...)
+{
     return 0;
 }
 
@@ -233,8 +153,10 @@ char* format(const char* fmt, ...) {
     char    *buffer;
     va_start( args, fmt );
     len = vsnprintf(NULL, 0, fmt, args ) + 1;
-    buffer = (char*)malloc(len * sizeof(char));
-    vsprintf( buffer, fmt, args );
+    buffer = (char*)malloc(len);
+    vsnprintf( buffer, len, fmt, args );
+    va_end( args );
+
     return buffer;
 }
 
@@ -243,9 +165,10 @@ int tolog(const char* fmt, ...) {
     int     len;
     char    *buffer;
     va_start( args, fmt );
-    len = vsnprintf(NULL, 0, fmt, args ) + 1;
-    buffer = (char*)malloc(len * sizeof(char));
-    vsprintf( buffer, fmt, args );
+    len = vsnprintf( NULL, 0, fmt, args ) + 1;
+    buffer = (char*)malloc( len );
+    vsnprintf( buffer, len, fmt, args );
+    va_end( args );
 
     printf("%s\n", buffer);
     free(buffer);
