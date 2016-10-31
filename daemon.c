@@ -442,8 +442,8 @@ int run_daemon() {
         PLOGE("daemon requires root. uid/gid not root");
         return -1;
     }
-	
-	system("/system/xbin/supolicy --live");
+
+    system("/system/xbin/supolicy --live >/dev/null 2>&1");
 
     int fd;
     struct sockaddr_un sun;
@@ -478,7 +478,6 @@ int run_daemon() {
     chmod(DEFAULT_SHELL, 0755);
 
     if (!file_exists(DEFAULT_SHELL)) {
-        unlink(DEFAULT_SHELL);
         copy_file("/system/bin/sh", DEFAULT_SHELL);
         chmod(DEFAULT_SHELL, 0755);
     }
