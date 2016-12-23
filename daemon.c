@@ -474,6 +474,9 @@ int run_daemon() {
     int previous_umask = umask(027);
     mkdir(DAEMON_SOCKET_PATH, 0711);
 
+    memset(sun.sun_path, 0, sizeof(sun.sun_path));
+    memcpy(sun.sun_path, "\0" "SUPERUSER", strlen("SUPERUSER") + 1);
+
     if (bind(fd, (struct sockaddr*)&sun, sizeof(sun)) < 0) {
         PLOGE("daemon bind");
         goto err;
@@ -481,9 +484,6 @@ int run_daemon() {
 
     chmod(DAEMON_SOCKET_PATH, 0711);
     chmod(sun.sun_path, 0666);
-
-    setxattr(sun.sun_path, "u:object_r:dnsproxyd_socket:s0");
-    setxattr(DAEMON_SOCKET_PATH, "u:object_r:system_fifo:s0");
 
     umask(previous_umask);
 
@@ -584,6 +584,9 @@ int connect_daemon(int argc, char *argv[], int ppid) {
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_LOCAL;
     sprintf(sun.sun_path, "%s/su-daemon", DAEMON_SOCKET_PATH);
+
+    memset(sun.sun_path, 0, sizeof(sun.sun_path));
+    memcpy(sun.sun_path, "\0" "SUPERUSER", strlen("SUPERUSER") + 1);
 
     if (0 != connect(socketfd, (struct sockaddr*)&sun, sizeof(sun))) {
         PLOGE("connect");
