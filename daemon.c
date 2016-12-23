@@ -34,6 +34,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <stdarg.h>
+#include <sys/types.h>
 #include <pthread.h>
 #include <sched.h>
 #include <termios.h>
@@ -460,7 +461,7 @@ int run_daemon() {
 
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_LOCAL;
-    sprintf(sun.sun_path, "%s/server", DAEMON_SOCKET_PATH);
+    sprintf(sun.sun_path, "%s/su-daemon", DAEMON_SOCKET_PATH);
 
     /*
      * Delete the socket to protect from situations when
@@ -473,15 +474,6 @@ int run_daemon() {
     int previous_umask = umask(027);
     mkdir(DAEMON_SOCKET_PATH, 0711);
 
-    unlink(DEFAULT_SHELL);
-    system("cat /system/bin/sh > /dev/root.daemon/sh");
-    chmod(DEFAULT_SHELL, 0755);
-
-    if (!file_exists(DEFAULT_SHELL)) {
-        copy_file("/system/bin/sh", DEFAULT_SHELL);
-        chmod(DEFAULT_SHELL, 0755);
-    }
-
     if (bind(fd, (struct sockaddr*)&sun, sizeof(sun)) < 0) {
         PLOGE("daemon bind");
         goto err;
@@ -490,7 +482,6 @@ int run_daemon() {
     chmod(DAEMON_SOCKET_PATH, 0711);
     chmod(sun.sun_path, 0666);
 
-    setxattr(DEFAULT_SHELL, "u:object_r:system_file:s0");
     setxattr(sun.sun_path, "u:object_r:dnsproxyd_socket:s0");
     setxattr(DAEMON_SOCKET_PATH, "u:object_r:system_fifo:s0");
 
@@ -592,7 +583,7 @@ int connect_daemon(int argc, char *argv[], int ppid) {
 
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_LOCAL;
-    sprintf(sun.sun_path, "%s/server", DAEMON_SOCKET_PATH);
+    sprintf(sun.sun_path, "%s/su-daemon", DAEMON_SOCKET_PATH);
 
     if (0 != connect(socketfd, (struct sockaddr*)&sun, sizeof(sun))) {
         PLOGE("connect");

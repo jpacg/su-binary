@@ -28,10 +28,10 @@ userid_t multiuser_get_user_id(uid_t uid);
 #define PLOGEV(fmt,err,args...) ALOGE(fmt " failed with %d: %s", ##args, err, strerror(err))
 #endif // !PLOGE
 
-#define ALOGW fix_unused
-#define ALOGE fix_unused
-#define ALOGD fix_unused
-#define ALOGV fix_unused
+#define ALOGW tolog
+#define ALOGE tolog
+#define ALOGD tolog
+#define ALOGV tolog
 
 #ifndef MS_SLAVE
 #define MS_SLAVE		1<<19	/* Slave */
