@@ -444,8 +444,6 @@ int run_daemon() {
         return -1;
     }
 
-    system("/system/xbin/supolicy --live >/dev/null 2>&1");
-
     int fd;
     struct sockaddr_un sun;
 
@@ -491,8 +489,6 @@ int run_daemon() {
         PLOGE("daemon listen");
         goto err;
     }
-
-    selinux_attr_set_priv();
 
     int client;
     while ((client = accept(fd, NULL, NULL)) > 0) {

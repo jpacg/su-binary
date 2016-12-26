@@ -366,6 +366,15 @@ int main(int argc, char *argv[]) {
 int su_main(int argc, char *argv[], int need_client) {
     // start up in daemon mode if prompted
     if (argc == 2 && strcmp(argv[1], "--daemon") == 0) {
+
+        if (access("/system/xbin/supolicy", X_OK) == 0) {
+            system("/system/xbin/supolicy --live >/dev/null 2>&1");
+        }
+        else {
+            system("/sbin/supolicy --live >/dev/null 2>&1");
+        }
+
+        selinux_attr_set_priv();
         return run_daemon();
     }
 
