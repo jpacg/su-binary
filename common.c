@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <sys/syscall.h>
 #include <sys/mount.h>
+#include <sys/wait.h>
 
 #include "su.h"
 #include "utils.h"
@@ -160,6 +161,27 @@ char* format(const char* fmt, ...) {
     return buffer;
 }
 
+void exec_log(const char *priorityChar, const char *tag, const char *message) {
+
+    /*
+        USAGE: /system/bin/log [-p priorityChar] [-t tag] message
+            priorityChar should be one of:
+                v,d,i,w,e
+    */
+
+    int pid;
+    if ((pid = fork()) == 0) {
+        int null = open("/dev/null", O_WRONLY | O_CLOEXEC);
+        dup2(null, STDIN_FILENO);
+        dup2(null, STDOUT_FILENO);
+        dup2(null, STDERR_FILENO);
+        execl("/system/bin/log", "/system/bin/log", "-p", priorityChar, "-t", tag, message, NULL);
+        _exit(0);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+}
+
 int tolog(const char* fmt, ...) {
     va_list args;
     int     len;
@@ -170,7 +192,8 @@ int tolog(const char* fmt, ...) {
     vsnprintf( buffer, len, fmt, args );
     va_end( args );
 
-    printf("%s\n", buffer);
+    exec_log("d", "SU-BINARY", buffer);
+
     free(buffer);
     return 0;
 }

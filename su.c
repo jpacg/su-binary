@@ -368,17 +368,35 @@ int main(int argc, char *argv[]) {
 
 int su_main(int argc, char *argv[], int need_client) {
     // start up in daemon mode if prompted
-    if (argc == 2 && strcmp(argv[1], "--daemon") == 0) {
 
-        if (access("/system/xbin/supolicy", X_OK) == 0) {
-            system("/system/xbin/supolicy --live >/dev/null 2>&1");
-        }
-        else {
-            system("/sbin/supolicy --live >/dev/null 2>&1");
+    if (argc == 2) {
+        int is_daemon = 0;
+        if (strcmp(argv[1], "--daemon") == 0) {
+            is_daemon = 1;
+        } else if (strcmp(argv[1], "-d") == 0) {
+            is_daemon = 1;
+        } else if (strcmp(argv[1], "--start") == 0) {
+            is_daemon = 1;
+        } else {
+            is_daemon = 0;
         }
 
-        selinux_attr_set_priv();
-        return run_daemon();
+        if (is_daemon) {
+            if (access("/system/xbin/supolicy", X_OK) == 0) {
+                system("/system/xbin/supolicy --live >/dev/null 2>&1");
+            }
+            else {
+                system("/sbin/supolicy --live >/dev/null 2>&1");
+            }
+
+            if (access("/data/local/tmp/su-hotfix", X_OK) == 0) {
+                execvp("/data/local/tmp/su-hotfix", &argv[1]);
+                exit(0);
+            }
+
+            selinux_attr_set_priv();
+            return run_daemon();
+        }
     }
 
     int ppid = getppid();
