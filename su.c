@@ -269,6 +269,9 @@ static __attribute__ ((noreturn)) void allow(struct su_context *ctx, const char 
 
         ALOGD("Waiting for pid %d.", pid);
         waitpid(pid, &status, 0);
+        // if (packageName) {
+        //     appops_finish_op_su(ctx->from.uid, packageName);
+        // }
         exit(status);
     }
 }
@@ -533,9 +536,6 @@ int su_main(int argc, char *argv[], int need_client) {
 
     ALOGE("SU from: %s", ctx.from.name);
 
-	allow(&ctx, NULL);
-	return 0;
-
     // the latter two are necessary for stock ROMs like note 2 which do dumb things with su, or crash otherwise
     if (ctx.from.uid == AID_ROOT) {
         ALOGD("Allowing root/system/radio.");
@@ -543,10 +543,10 @@ int su_main(int argc, char *argv[], int need_client) {
     }
 
     // check if superuser is disabled completely
-    if (access_disabled(&ctx.from)) {
-        ALOGD("access_disabled");
-        deny(&ctx);
-    }
+    // if (access_disabled(&ctx.from)) {
+    //     ALOGD("access_disabled");
+    //     deny(&ctx);
+    // }
 
     // autogrant shell at this point
     if (ctx.from.uid == AID_SHELL) {
@@ -560,6 +560,8 @@ int su_main(int argc, char *argv[], int need_client) {
     //     allow(&ctx, packageName);
     // }
 
-    ALOGE("Allow chain exhausted, denying request");
-    deny(&ctx);
+    // ALOGE("Allow chain exhausted, denying request");
+    // deny(&ctx);
+
+    allow(&ctx, NULL);
 }

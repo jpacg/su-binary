@@ -4,5 +4,6 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := su
 LOCAL_LDFLAGS := -static
 LOCAL_SRC_FILES := su.c daemon.c utils.c pts.c common.c
+LOCAL_CFLAGS += -Werror
 
 include $(BUILD_EXECUTABLE)
