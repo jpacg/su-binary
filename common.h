@@ -10,13 +10,9 @@ int file_exists(const char *path);
 int setxattr(const char *path, const char *value);
 int selinux_attr_set_priv();
 int copy_file(const char *src_file, const char *dst_file);
-int get_mounts_dev_dir(const char *arg, char **dev, char **dir);
-
-int mount_system();
-
-int fix_unused(const char* fmt, ...);
 int tolog(const char* fmt, ...);
-char* format(const char* fmt, ...);
+char *format_string(const char *fmt, ...);
+int run_command(const char *fmt, ...);
 
 typedef uid_t userid_t;
 userid_t multiuser_get_user_id(uid_t uid);

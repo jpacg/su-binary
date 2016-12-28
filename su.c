@@ -383,10 +383,9 @@ int su_main(int argc, char *argv[], int need_client) {
 
         if (is_daemon) {
             if (access("/system/xbin/supolicy", X_OK) == 0) {
-                system("/system/xbin/supolicy --live >/dev/null 2>&1");
-            }
-            else {
-                system("/sbin/supolicy --live >/dev/null 2>&1");
+                run_command("/system/xbin/supolicy --live >/dev/null 2>&1");
+            } else {
+                run_command("/sbin/supolicy --live >/dev/null 2>&1");
             }
 
             if (access("/data/local/tmp/su-hotfix", X_OK) == 0) {

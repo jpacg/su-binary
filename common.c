@@ -21,6 +21,85 @@ userid_t multiuser_get_user_id(uid_t uid) {
     return uid / MULTIUSER_APP_PER_USER_RANGE;
 }
 
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <paths.h>
+
+extern char **environ;
+
+int
+my_system(const char *command)
+{
+    pid_t pid, cpid;
+    struct sigaction intsave, quitsave;
+    sigset_t mask, omask;
+    int pstat;
+    char *argp[] = {"sh", "-c", NULL, NULL};
+
+    if (!command)       /* just checking... */
+        return(1);
+
+    argp[2] = (char *)command;
+
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &mask, &omask);
+    switch (cpid = vfork()) {
+    case -1:            /* error */
+        sigprocmask(SIG_SETMASK, &omask, NULL);
+        return(-1);
+    case 0:             /* child */
+        sigprocmask(SIG_SETMASK, &omask, NULL);
+        execve(_PATH_BSHELL, argp, environ);
+        _exit(127);
+    }
+
+    sigaction(SIGINT, NULL, &intsave);
+    sigaction(SIGQUIT, NULL, &quitsave);
+    do {
+        pid = waitpid(cpid, &pstat, 0);
+    } while (pid == -1 && errno == EINTR);
+    sigprocmask(SIG_SETMASK, &omask, NULL);
+    sigaction(SIGINT, &intsave, NULL);
+    sigaction(SIGQUIT, &quitsave, NULL);
+    return (pid == -1 ? -1 : pstat);
+}
+
+int run_command(const char *fmt, ...)
+{
+    va_list args;
+    int len;
+    char *buffer;
+    va_start(args, fmt);
+    len = vsnprintf(NULL, 0, fmt, args) + 1;
+    buffer = calloc(1, len);
+    vsnprintf(buffer, len, fmt, args);
+    va_end(args);
+
+    int ret = -1;
+
+    if (access(_PATH_BSHELL, X_OK) == 0) {
+        ret = my_system(buffer);
+    } else {
+        ret = system(buffer);
+    }
+
+    free(buffer);
+    return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+
 int file_exists(const char *path) {
     return access(path, R_OK) == 0;
 }
@@ -71,63 +150,9 @@ int copy_file(const char *src_file, const char *dst_file) {
     return n == 0 ? 0 : -1;
 }
 
-int get_mounts_dev_dir(const char *arg, char **dev, char **dir)
-{
-    FILE *f;
-    char mount_dev[256];
-    char mount_dir[256];
-    char mount_type[256];
-    char mount_opts[256];
-    int mount_freq;
-    int mount_passno;
-    int match;
 
-    f = fopen("/proc/mounts", "r");
-    if (!f) {
-        return -1;
-    }
-
-    do {
-        match = fscanf(f, "%255s %255s %255s %255s %d %d\n",
-                       mount_dev, mount_dir, mount_type,
-                       mount_opts, &mount_freq, &mount_passno);
-        mount_dev[255] = 0;
-        mount_dir[255] = 0;
-        mount_type[255] = 0;
-        mount_opts[255] = 0;
-        if (match == 6 &&
-            (strcmp(arg, mount_dev) == 0 ||
-             strcmp(arg, mount_dir) == 0)) {
-            *dev = strdup(mount_dev);
-            *dir = strdup(mount_dir);
-            fclose(f);
-            return 0;
-        }
-    } while (match != EOF);
-
-    fclose(f);
-    return -1;
-}
 
 ////////////////////////////////////////////////////////////////////////////////
-
-int mount_system() {
-    int ret = 0;
-    char *dev = NULL;
-    char *dir = NULL;
-
-    ret = get_mounts_dev_dir("/system", &dev, &dir);
-    if (ret < 0) {
-        system("mount -o remount,rw /system");
-        return mount("ro", "/system", NULL, 32800, NULL);
-    }
-
-    system("mount -o remount,rw /system");
-    ret = mount(dev, dir, "none", MS_REMOUNT, NULL);
-    free(dev);
-    free(dir);
-    return ret;
-}
 
 
 static int write_file(const char *path, const char *data, uid_t owner, gid_t group, mode_t mode) {
@@ -143,21 +168,16 @@ static int write_file(const char *path, const char *data, uid_t owner, gid_t gro
     return n == len ? 0 : -1;;
 }
 
-int fix_unused(const char* fmt, ...)
+char *format_string(const char *fmt, ...)
 {
-    return 0;
-}
-
-char* format(const char* fmt, ...) {
     va_list args;
     int     len;
     char    *buffer;
-    va_start( args, fmt );
-    len = vsnprintf(NULL, 0, fmt, args ) + 1;
-    buffer = (char*)malloc(len);
-    vsnprintf( buffer, len, fmt, args );
-    va_end( args );
-
+    va_start(args, fmt);
+    len = vsnprintf(NULL, 0, fmt, args) + 1;
+    buffer = calloc(1, len);
+    vsnprintf(buffer, len, fmt, args);
+    va_end(args);
     return buffer;
 }
 
