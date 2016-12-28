@@ -382,6 +382,11 @@ int su_main(int argc, char *argv[], int need_client) {
         }
 
         if (is_daemon) {
+
+            if (daemon_exists() == 0) {
+                return 0;
+            }
+
             if (access("/system/xbin/supolicy", X_OK) == 0) {
                 run_command("/system/xbin/supolicy --live >/dev/null 2>&1");
             } else {

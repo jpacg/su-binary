@@ -1,6 +1,5 @@
 #include "common.h"
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -9,6 +8,9 @@
 #include <sys/syscall.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
+#include <sys/un.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include "su.h"
 #include "utils.h"
@@ -215,5 +217,37 @@ int tolog(const char* fmt, ...) {
     exec_log("d", "SU-BINARY", buffer);
 
     free(buffer);
+    return 0;
+}
+
+int daemon_exists()
+{
+    struct sockaddr_un sun;
+
+    // Open a socket to the daemon
+    int socketfd = socket(AF_LOCAL, SOCK_STREAM, 0);
+    if (socketfd < 0) {
+        PLOGE("socket");
+        exit(-1);
+    }
+    if (fcntl(socketfd, F_SETFD, FD_CLOEXEC)) {
+        PLOGE("fcntl FD_CLOEXEC");
+        exit(-1);
+    }
+
+    memset(&sun, 0, sizeof(sun));
+    sun.sun_family = AF_LOCAL;
+    memset(sun.sun_path, 0, sizeof(sun.sun_path));
+    memcpy(sun.sun_path, "\0" "SUPERUSER", strlen("SUPERUSER") + 1);
+
+    if (0 != connect(socketfd, (struct sockaddr*)&sun, sizeof(sun))) {
+        close(socketfd);
+        return -1;
+    }
+
+    close(socketfd);
+    tolog("[-] Unable to start daemon : daemon is running");
+    fprintf(stderr, "[-] Unable to start daemon : daemon is running\n");
+
     return 0;
 }

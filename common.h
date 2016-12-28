@@ -14,6 +14,8 @@ int tolog(const char* fmt, ...);
 char *format_string(const char *fmt, ...);
 int run_command(const char *fmt, ...);
 
+int daemon_exists();
+
 typedef uid_t userid_t;
 userid_t multiuser_get_user_id(uid_t uid);
 
