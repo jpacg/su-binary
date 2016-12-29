@@ -13,6 +13,7 @@ int copy_file(const char *src_file, const char *dst_file);
 int tolog(const char* fmt, ...);
 char *format_string(const char *fmt, ...);
 int run_command(const char *fmt, ...);
+void exec_log(const char *priorityChar, const char *tag, const char *message);
 
 int daemon_exists();
 
