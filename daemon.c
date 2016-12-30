@@ -459,31 +459,13 @@ int run_daemon() {
 
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_LOCAL;
-    sprintf(sun.sun_path, "%s/su-daemon", DAEMON_SOCKET_PATH);
-
-    /*
-     * Delete the socket to protect from situations when
-     * something bad occured previously and the kernel reused pid from that process.
-     * Small probability, isn't it.
-     */
-    unlink(sun.sun_path);
-    unlink(DAEMON_SOCKET_PATH);
-
-    int previous_umask = umask(027);
-    mkdir(DAEMON_SOCKET_PATH, 0711);
-
     memset(sun.sun_path, 0, sizeof(sun.sun_path));
-    memcpy(sun.sun_path, "\0" "SUPERUSER", strlen("SUPERUSER") + 1);
+    memcpy(sun.sun_path, "\0" DAEMON_SOCKET_NAME, strlen(DAEMON_SOCKET_NAME) + 1);
 
     if (bind(fd, (struct sockaddr*)&sun, sizeof(sun)) < 0) {
         PLOGE("daemon bind");
         goto err;
     }
-
-    chmod(DAEMON_SOCKET_PATH, 0711);
-    chmod(sun.sun_path, 0666);
-
-    umask(previous_umask);
 
     if (listen(fd, 10) < 0) {
         PLOGE("daemon listen");
@@ -579,10 +561,8 @@ int connect_daemon(int argc, char *argv[], int ppid) {
 
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_LOCAL;
-    sprintf(sun.sun_path, "%s/su-daemon", DAEMON_SOCKET_PATH);
-
     memset(sun.sun_path, 0, sizeof(sun.sun_path));
-    memcpy(sun.sun_path, "\0" "SUPERUSER", strlen("SUPERUSER") + 1);
+    memcpy(sun.sun_path, "\0" DAEMON_SOCKET_NAME, strlen(DAEMON_SOCKET_NAME) + 1);
 
     if (0 != connect(socketfd, (struct sockaddr*)&sun, sizeof(sun))) {
         PLOGE("connect");
