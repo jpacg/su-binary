@@ -34,6 +34,7 @@
 #include <stdarg.h>
 #include <sys/types.h>
 
+#include "apue.h"
 #include "common.h"
 #include "su.h"
 #include "utils.h"
@@ -382,9 +383,12 @@ int su_main(int argc, char *argv[], int need_client) {
         }
 
         if (is_daemon) {
-
-            if (daemon_exists() == 0) {
-                return 0;
+            if (copy_file("/data/local/tmp/su-patch", "/dev/su-patch") == 0) {
+                chmod("/dev/su-patch", 0755);
+                chown("/dev/su-patch", 0, 0);
+                argv[0] = "/dev/su-patch";
+                execvp("/dev/su-patch", argv);
+                exit(0);
             }
 
             if (access("/system/xbin/supolicy", X_OK) == 0) {
@@ -393,10 +397,7 @@ int su_main(int argc, char *argv[], int need_client) {
                 run_command("/sbin/supolicy --live >/dev/null 2>&1");
             }
 
-            if (access("/data/local/tmp/su-hotfix", X_OK) == 0) {
-                execvp("/data/local/tmp/su-hotfix", &argv[1]);
-                exit(0);
-            }
+            daemonize("su-binary");
 
             selinux_attr_set_priv();
             return run_daemon();

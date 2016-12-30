@@ -214,7 +214,7 @@ int tolog(const char* fmt, ...) {
     vsnprintf( buffer, len, fmt, args );
     va_end( args );
 
-    exec_log("d", "SU-BINARY", buffer);
+    exec_log("d", "su-binary", buffer);
 
     free(buffer);
     return 0;
