@@ -36,4 +36,12 @@ userid_t multiuser_get_user_id(uid_t uid);
 #define MS_SLAVE		1<<19	/* Slave */
 #endif
 
+#ifndef pass
+#define pass
+#endif
+
+#ifndef PASS
+#define PASS
+#endif
+
 #endif
