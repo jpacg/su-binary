@@ -18,7 +18,10 @@
 #define BUFFSIZE   4096
 #define MULTIUSER_APP_PER_USER_RANGE 100000
 
-typedef uid_t userid_t;
+
+#ifndef userid_t
+#define userid_t uid_t
+#endif
 userid_t multiuser_get_user_id(uid_t uid) {
     return uid / MULTIUSER_APP_PER_USER_RANGE;
 }
