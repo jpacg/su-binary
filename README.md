@@ -6,7 +6,9 @@ Note
 
 * Source code is modified by CyanogenMod su, https://github.com/CyanogenMod/android_system_extras_su
 
-* Supports android 4.3+ devices and need to use `su--daemon`
+* Supports android 4.3+ devices and need to use `su --daemon` or `su -d`
+
+* Android 6.0+ requires patch boot partition
 
 
 Building
