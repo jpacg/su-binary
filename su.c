@@ -364,6 +364,22 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    char *name = argv[0];
+    if((argc > 1) && (argv[1][0] == '@')) {
+        name = argv[1] + 1;
+        argc--;
+        argv++;
+    } else {
+        char *cmd = strrchr(argv[0], '/');
+        if (cmd)
+            name = cmd + 1;
+    }
+
+    if (!strcmp(name, "supolicy")) {
+        int supolicy_main(int argc, char **argv);
+        return supolicy_main(argc, argv);
+    }
+
     return su_main(argc, argv, 1);
 }
 
