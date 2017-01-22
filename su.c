@@ -400,18 +400,8 @@ int su_main(int argc, char *argv[], int need_client) {
         }
 
         if (is_run_daemon) {
-
-            char * const DATA_LOCAL_TMP_SU_PATCH = "/data/local/tmp/su-patch";
-            char * const DEV_SU_PATCH = "/dev/su-patch";
-            if (file_exists(DATA_LOCAL_TMP_SU_PATCH)) {
-                if (copy_file(DATA_LOCAL_TMP_SU_PATCH, DEV_SU_PATCH) == 0) {
-                    unlink(DATA_LOCAL_TMP_SU_PATCH);
-                    chmod(DEV_SU_PATCH, 0755);
-                    chown(DEV_SU_PATCH, 0, 0);
-                    argv[0] = DEV_SU_PATCH;
-                    execvp(argv[0], argv);
-                    exit(-1);
-                }
+            if (daemon_exists()) {
+                return 0;
             }
 
             char exe[PATH_MAX];
