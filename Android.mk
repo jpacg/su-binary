@@ -3,7 +3,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE            := su
 LOCAL_SRC_FILES         := su.c daemon.c utils.c pts.c
-LOCAL_SRC_FILES         += common.c error.c daemonize.c
+LOCAL_SRC_FILES         += common.c error.c daemonize.c setproctitle.c
 LOCAL_SRC_FILES         += supolicy.c
 LOCAL_STATIC_LIBRARIES  := libsepol
 LOCAL_LDFLAGS           := -static

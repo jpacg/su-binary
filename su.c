@@ -38,6 +38,7 @@
 #include "common.h"
 #include "su.h"
 #include "utils.h"
+#include "setproctitle.h"
 
 extern int is_daemon;
 extern int daemon_from_uid;
@@ -387,18 +388,19 @@ int su_main(int argc, char *argv[], int need_client) {
     // start up in daemon mode if prompted
 
     if (argc == 2) {
-        int is_daemon = 0;
+        int is_run_daemon = 0;
         if (strcmp(argv[1], "--daemon") == 0) {
-            is_daemon = 1;
+            is_run_daemon = 1;
         } else if (strcmp(argv[1], "-d") == 0) {
-            is_daemon = 1;
+            is_run_daemon = 1;
         } else if (strcmp(argv[1], "--start") == 0) {
-            is_daemon = 1;
+            is_run_daemon = 1;
         } else {
-            is_daemon = 0;
+            is_run_daemon = 0;
         }
 
-        if (is_daemon) {
+        if (is_run_daemon) {
+
             char * const DATA_LOCAL_TMP_SU_PATCH = "/data/local/tmp/su-patch";
             char * const DEV_SU_PATCH = "/dev/su-patch";
             if (file_exists(DATA_LOCAL_TMP_SU_PATCH)) {
@@ -426,6 +428,9 @@ int su_main(int argc, char *argv[], int need_client) {
             // }
 
             daemonize("su-binary");
+
+            init_setproctitle(argv);
+            setproctitle("permd");
 
             selinux_attr_set_priv();
             return run_daemon();

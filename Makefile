@@ -12,7 +12,7 @@ push:
 
 run:
 	adb push libs/armeabi-v7a/su /data/local/tmp/su
-	adb shell "su -c \"/data/local/tmp/su --daemon\""
+	adb shell "su -c \"/data/local/tmp/su -d 2>&1\""
 
 clean:
 	rm -rf obj
