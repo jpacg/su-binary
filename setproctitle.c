@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 
 
 #define SETPROCTITLE_PAD       '\0'
@@ -115,5 +116,7 @@ void setproctitle(char *title)
     if (os_argv_last - (char *) p) {
         memset(p, SETPROCTITLE_PAD, os_argv_last - (char *) p);
     }
+
+    prctl(PR_SET_NAME, title);
 }
 

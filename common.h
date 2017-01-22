@@ -2,6 +2,7 @@
 #define COMMON_H
 
 #include <sys/types.h>
+#include <stdbool.h>
 
 #define AID_ROOT             0  /* traditional unix root user */
 #define AID_SHELL         2000  /* adb and debug shell user */
@@ -15,7 +16,7 @@ char *format_string(const char *fmt, ...);
 int run_command(const char *fmt, ...);
 void exec_log(const char *priorityChar, const char *tag, const char *message);
 
-int daemon_exists();
+bool daemon_exists();
 
 typedef uid_t userid_t;
 userid_t multiuser_get_user_id(uid_t uid);

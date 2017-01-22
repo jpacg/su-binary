@@ -11,6 +11,7 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <stdbool.h>
 
 #include "su.h"
 #include "utils.h"
@@ -223,34 +224,34 @@ int tolog(const char* fmt, ...) {
     return 0;
 }
 
-int daemon_exists()
+bool daemon_exists()
 {
-    struct sockaddr_un sun;
+    FILE *fp_unix;
+    int Num;
+    int RefCount;
+    int Protocol;
+    int Flags;
+    unsigned int Type;
+    int St;
+    unsigned Inode;
+    char Path[PATH_MAX];
 
-    // Open a socket to the daemon
-    int socketfd = socket(AF_LOCAL, SOCK_STREAM, 0);
-    if (socketfd < 0) {
-        PLOGE("socket");
-        exit(-1);
+    fp_unix = fopen("/proc/net/unix", "r");
+    if (!fp_unix)
+        goto out;
+
+    fgets(Path, PATH_MAX, fp_unix);
+    memset(Path, 0, PATH_MAX);
+
+    while (fscanf(fp_unix, "%x: %x %x %x %x %x %d %s\n", &Num, &RefCount, &Protocol, &Flags, &Type, &St, &Inode, Path) > 0) {
+        if (strstr(Path, DAEMON_SOCKET_NAME)) {
+            fclose(fp_unix);
+            fprintf(stderr, "[-] Unable to start daemon : daemon is running\n");
+            return  true;
+        }
     }
-    if (fcntl(socketfd, F_SETFD, FD_CLOEXEC)) {
-        PLOGE("fcntl FD_CLOEXEC");
-        exit(-1);
-    }
 
-    memset(&sun, 0, sizeof(sun));
-    sun.sun_family = AF_LOCAL;
-    memset(sun.sun_path, 0, sizeof(sun.sun_path));
-    memcpy(sun.sun_path, "\0" "SUPERUSER", strlen("SUPERUSER") + 1);
-
-    if (0 != connect(socketfd, (struct sockaddr*)&sun, sizeof(sun))) {
-        close(socketfd);
-        return -1;
-    }
-
-    close(socketfd);
-    tolog("[-] Unable to start daemon : daemon is running");
-    fprintf(stderr, "[-] Unable to start daemon : daemon is running\n");
-
-    return 0;
+    fclose(fp_unix);
+out:
+    return false;
 }
