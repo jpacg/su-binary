@@ -441,7 +441,7 @@ error:
 int run_daemon() {
     if (getuid() != 0 || getgid() != 0) {
         PLOGE("daemon requires root. uid/gid not root");
-        return -1;
+        // return -1;
     }
 
     int fd;
@@ -521,7 +521,7 @@ static void sighandler(__attribute__ ((unused)) int sig) {
 
 /**
  * Setup signal handlers trap signals which should result in program termination
- * so that we can restore the terminal to its normal state and retrieve the 
+ * so that we can restore the terminal to its normal state and retrieve the
  * return code.
  */
 static void setup_sighandlers(void) {
