@@ -1,9 +1,9 @@
-/* 
- * This was derived from public domain works with updates to 
- * work with more modern SELinux libraries. 
- * 
+/*
+ * This was derived from public domain works with updates to
+ * work with more modern SELinux libraries.
+ *
  * It is released into the public domain.
- * 
+ *
  */
 
 #include <getopt.h>
@@ -451,7 +451,7 @@ int load_policy(char *filename, policydb_t *policydb, struct policy_file *pf) {
 int add_rule_auto(type_datum_t *src, type_datum_t *tgt, class_datum_t *cls, perm_datum_t *perm, int effect, int not, policydb_t *policy) {
 	hashtab_t type_table, class_table, perm_table;
 	hashtab_ptr_t cur;
-	
+
 	type_table = policy->p_types.table;
 	class_table = policy->p_classes.table;
 
@@ -549,7 +549,7 @@ int add_rule(char *s, char *t, char *c, char *p, int effect, int not, policydb_t
 			// fprintf(stderr, "No class is specified, cannot add perm [%s] \n", p);
 			return 1;
 		}
-		
+
 		if (cls != NULL) {
 			perm = hashtab_search(cls->permissions.table, p);
 			if (perm == NULL && cls->comdatum != NULL) {
@@ -574,7 +574,7 @@ int live_patch(policydb_t *policydb, char *filename) {
 	if (data == NULL) fprintf(stderr, "Error!");
 
 	// based on libselinux security_load_policy()
-	fd = open(filename, O_RDWR);
+	fd = open(filename, O_RDWR|O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if (fd < 0) {
 		fprintf(stderr, "Can't open '%s':  %s\n",
 		        filename, strerror(errno));
