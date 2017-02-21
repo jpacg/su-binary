@@ -15,7 +15,7 @@
 ** limitations under the License.
 */
 
-#ifndef SU_h 
+#ifndef SU_h
 #define SU_h 1
 
 #ifdef LOG_TAG
@@ -39,7 +39,7 @@
 #ifndef VERSION_CODE
 #define VERSION_CODE 16
 #endif
-#define VERSION xstr(VERSION_CODE) " https://github.com/jpacg/su-binary"
+#define VERSION xstr(VERSION_CODE) " su-binary <https://github.com/jpacg/su-binary>"
 
 #define PROTO_VERSION 1
 
