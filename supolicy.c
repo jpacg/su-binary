@@ -421,14 +421,14 @@ int load_policy(char *filename, policydb_t *policydb, struct policy_file *pf) {
 	if (fstat(fd, &sb) < 0) {
 		fprintf(stderr, "Can't stat '%s':  %s\n",
 				filename, strerror(errno));
-		return 1;
+		goto out;
 	}
 	map = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE,
 				fd, 0);
 	if (map == MAP_FAILED) {
 		fprintf(stderr, "Can't mmap '%s':  %s\n",
 				filename, strerror(errno));
-		return 1;
+		goto out;
 	}
 
 	policy_file_init(pf);
@@ -437,15 +437,20 @@ int load_policy(char *filename, policydb_t *policydb, struct policy_file *pf) {
 	pf->len = sb.st_size;
 	if (policydb_init(policydb)) {
 		fprintf(stderr, "policydb_init: Out of memory!\n");
-		return 1;
+		goto out;
 	}
 	ret = policydb_read(policydb, pf, 1);
 	if (ret) {
 		fprintf(stderr, "error(s) encountered while parsing configuration\n");
-		return 1;
+		goto out;
 	}
 
+	close(fd);
 	return 0;
+
+out:
+	close(fd);
+	return 1;
 }
 
 int add_rule_auto(type_datum_t *src, type_datum_t *tgt, class_datum_t *cls, perm_datum_t *perm, int effect, int not, policydb_t *policy) {
