@@ -359,6 +359,7 @@ static void fork_for_samsung(void)
     }
 }
 
+int supolicy_main(int argc, char **argv);
 int main(int argc, char *argv[]) {
     if (getuid() != geteuid()) {
         ALOGE("must not be a setuid binary");
@@ -377,7 +378,6 @@ int main(int argc, char *argv[]) {
     }
 
     if (!strcmp(name, "supolicy")) {
-        int supolicy_main(int argc, char **argv);
         return supolicy_main(argc, argv);
     }
 
@@ -404,18 +404,17 @@ int su_main(int argc, char *argv[], int need_client) {
                 return 0;
             }
 
-            char exe[PATH_MAX];
-            if (readlink("/proc/self/exe", exe, PATH_MAX-1) > 0) {
-                run_command("%s @supolicy --live", exe);
-            } else if (access("/system/xbin/supolicy", X_OK) == 0) {
-                run_command("/system/xbin/supolicy --live >/dev/null 2>&1");
-            } else if (access("/sbin/supolicy", X_OK) == 0) {
-                run_command("/sbin/supolicy --live >/dev/null 2>&1");
-            } else {
-                pass;
-            }
-
             daemonize("su-binary");
+
+            printf("Patch begin\n");
+
+            // Patch selinux
+            int supolicy_argc = 2;
+            char *supolicy_argv[] = {"supolicy", "--live", NULL};
+            supolicy_main(supolicy_argc, supolicy_argv);
+
+            printf("Patch end\n");
+
 
             init_setproctitle(argv);
             setproctitle("permd");
