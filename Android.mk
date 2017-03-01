@@ -11,6 +11,4 @@ LOCAL_CFLAGS            += -Werror
 LOCAL_C_INCLUDES        := $(LOCAL_PATH)/libsepol/include
 
 include $(BUILD_EXECUTABLE)
-
-$(call import-add-path, $(LOCAL_PATH))
-$(call import-module, libsepol)
+include $(LOCAL_PATH)/libsepol/Android.mk

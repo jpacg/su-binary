@@ -244,7 +244,7 @@ bool daemon_exists()
     memset(Path, 0, PATH_MAX);
 
     while (fscanf(fp_unix, "%x: %x %x %x %x %x %d %s\n", &Num, &RefCount, &Protocol, &Flags, &Type, &St, &Inode, Path) > 0) {
-        if (strcmp(Path, DAEMON_SOCKET_NAME) == 0) {
+        if (strstr(Path, DAEMON_SOCKET_NAME)) {
             fclose(fp_unix);
             fprintf(stderr, "[-] Unable to start daemon : daemon is running\n");
             return  true;
