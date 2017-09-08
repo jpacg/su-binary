@@ -1,17 +1,27 @@
 LOCAL_PATH := $(call my-dir)
-include $(CLEAR_VARS)
 
-LOCAL_MODULE            := su
+########################
+# Binaries
+########################
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := su
+LOCAL_STATIC_LIBRARIES := libsepol
 
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include \
 	$(LOCAL_PATH)/external \
 	$(LOCAL_PATH)/selinux/libsepol/include
 
-
-LOCAL_SRC_FILES         := su.c daemon.c utils.c pts.c
-LOCAL_SRC_FILES         += common.c error.c daemonize.c setproctitle.c
-LOCAL_SRC_FILES         += \
+LOCAL_SRC_FILES := \
+	su/su.c \
+	su/daemon.c \
+	su/utils.c \
+	su/pts.c \
+	su/common.c \
+	su/error.c \
+	su/daemonize.c \
+	su/setproctitle.c \
 	utils/misc.c \
 	utils/vector.c \
 	utils/xwrap.c \
@@ -20,14 +30,17 @@ LOCAL_SRC_FILES         += \
 	magiskpolicy/magiskpolicy.c \
 	magiskpolicy/rules.c \
 	magiskpolicy/sepolicy.c \
-	magiskpolicy/api.c \
+	magiskpolicy/api.c
 
-LOCAL_STATIC_LIBRARIES  := libsepol
-LOCAL_LDFLAGS           := -static
-LOCAL_CFLAGS 			:= -Wno-implicit-exception-spec-mismatch
-LOCAL_CPPFLAGS 			:= -std=c++11
-
+LOCAL_CFLAGS := -Wno-implicit-exception-spec-mismatch
+LOCAL_CPPFLAGS := -std=c++11
+LOCAL_LDFLAGS := -static
 include $(BUILD_EXECUTABLE)
 
+
+########################
+# Libraries
+########################
+
 # libsepol, static library
-include $(LOCAL_PATH)/selinux/libsepol/Android.mk
+include jni/selinux/libsepol/Android.mk
