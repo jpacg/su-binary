@@ -1,0 +1,62 @@
+#!/bin/bash
+
+PWD=`pwd`
+WIKIDIR=../selinux.wiki
+
+if [ \! -d $WIKIDIR ]; then
+    git clone git@github.com:SELinuxProject/selinux.wiki.git $WIKIDIR
+fi
+
+DEST=$WIKIDIR/files/releases/$(date '+%Y%m%d')
+DIRS="libsepol libselinux libsemanage checkpolicy secilc policycoreutils mcstrans restorecond semodule-utils"
+DIRS_NEED_PREFIX="dbus gui python sandbox"
+
+git tag -a $(date '+%Y%m%d') -m "Release $(date '+%Y%m%d')"
+
+rm -rf $DEST
+mkdir -p $DEST
+
+for i in $DIRS; do
+	cd $i
+	VERS=`cat VERSION`
+	ARCHIVE=$i-$VERS.tar.gz
+	git tag $i-$VERS > /dev/null 2>&1
+	git archive --format=tar --prefix=$i-$VERS/ $i-$VERS | gzip > ../$DEST/$ARCHIVE
+	cd ..
+done
+
+for i in $DIRS_NEED_PREFIX; do
+	cd $i
+	VERS=`cat VERSION`
+	ARCHIVE=selinux-$i-$VERS.tar.gz
+	git tag selinux-$i-$VERS > /dev/null 2>&1
+	git archive --format=tar --prefix=selinux-$i-$VERS/ selinux-$i-$VERS | gzip > ../$DEST/$ARCHIVE
+	cd ..
+done
+
+cd $DEST
+
+git add .
+
+echo "Add the following to the $WIKIDIR/Releases.md wiki page:"
+
+echo ""
+
+echo "## Release $(date '+%Y-%m-%d')"
+
+for i in *.tar.gz; do
+
+	echo -n "[$i](https://raw.githubusercontent.com/wiki/SELinuxProject/selinux/files/releases/$(date '+%Y%m%d')/$i) "
+	sha256sum $i | cut -d " " -f 1
+	echo ""
+done
+
+echo "And then run:"
+echo "  cd $WIKIDIR"
+echo "  git commit  -m \"Release $(date '+%Y%m%d')\" -a -s"
+echo "  git push"
+
+echo ""
+echo "Push the release and its tags to git via:"
+echo "  git push"
+echo "  git push --tags"

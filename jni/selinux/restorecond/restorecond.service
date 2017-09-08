@@ -1,0 +1,12 @@
+[Unit]
+Description=Restorecon maintaining path file context
+ConditionPathExists=/etc/selinux/restorecond.conf
+ConditionSecurity=selinux
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/restorecond
+PIDFile=/var/run/restorecond.pid
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Translates SELinux MCS/MLS labels to human readable form
+ConditionSecurity=selinux
+
+[Service]
+ExecStart=/sbin/mcstransd -f
+RuntimeDirectory=setrans
+
+[Install]
+WantedBy=multi-user.target
