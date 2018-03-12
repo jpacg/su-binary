@@ -1,6 +1,8 @@
 su binary
 ===
 
+# This project is no longer maintained. Please refer to Magisk if you need it.
+
 Note
 ========
 
