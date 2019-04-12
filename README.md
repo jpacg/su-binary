@@ -1,7 +1,7 @@
 su binary
 ===
 
-# This project is no longer maintained. Please refer to Magisk if you need it.
+# This project is no longer maintained. Please refer to [Magisk](https://github.com/topjohnwu/Magisk) if you need it.
 
 Note
 ========
